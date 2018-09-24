@@ -63,9 +63,9 @@ public class MainActivity extends AppCompatActivity {
 
                 //a0001
                 FirebaseDatabase database = FirebaseDatabase.getInstance();
-                DatabaseReference inputLon = database.getReference("users/a0001/lon");
+                DatabaseReference inputLon = database.getReference("users/a0002/lon");
                 inputLon.setValue(location.getLongitude());
-                DatabaseReference inputLat = database.getReference("users/a0001/lat");
+                DatabaseReference inputLat = database.getReference("users/a0002/lat");
                 inputLat.setValue(location.getLatitude());
             }
 
