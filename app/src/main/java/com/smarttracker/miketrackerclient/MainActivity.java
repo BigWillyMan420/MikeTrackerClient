@@ -51,6 +51,17 @@ public class MainActivity extends AppCompatActivity {
                 startActivity(intent);
             }
         });
+
+        Button monitorButton = findViewById(R.id.button4);
+        monitorButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                //open a new screen
+                Intent intent = new Intent(MainActivity.this, MonitorActivity.class);
+                startActivity(intent);
+            }
+        });
+
 // Acquire a reference to the system Location Manager
         final LocationManager locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
 
