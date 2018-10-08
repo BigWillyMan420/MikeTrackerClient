@@ -1,6 +1,7 @@
 package com.smarttracker.miketrackerclient;
 
 import android.Manifest;
+import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -24,13 +25,36 @@ import com.karumi.dexter.listener.PermissionDeniedResponse;
 import com.karumi.dexter.listener.PermissionGrantedResponse;
 import com.karumi.dexter.listener.PermissionRequest;
 import com.karumi.dexter.listener.single.PermissionListener;
+import com.kontakt.sdk.android.ble.connection.OnServiceReadyListener;
+import com.kontakt.sdk.android.ble.manager.ProximityManager;
+import com.kontakt.sdk.android.ble.manager.ProximityManagerFactory;
+import com.kontakt.sdk.android.ble.manager.listeners.EddystoneListener;
+import com.kontakt.sdk.android.ble.manager.listeners.IBeaconListener;
+import com.kontakt.sdk.android.ble.manager.listeners.simple.SimpleEddystoneListener;
+import com.kontakt.sdk.android.ble.manager.listeners.simple.SimpleIBeaconListener;
+import com.kontakt.sdk.android.common.KontaktSDK;
+import com.kontakt.sdk.android.common.profile.IBeaconDevice;
+import com.kontakt.sdk.android.common.profile.IBeaconRegion;
+import com.kontakt.sdk.android.common.profile.IEddystoneDevice;
+import com.kontakt.sdk.android.common.profile.IEddystoneNamespace;
+
+import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
+
+    private ProximityManager proximityManager;
+    private Location latestLocation;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main_menu);
+
+        KontaktSDK.initialize("zcJxmhHZEovRtxZDFYEunNHpAIhZyKfc");
+
+        proximityManager = ProximityManagerFactory.create(this);
+        proximityManager.setIBeaconListener(createIBeaconListener());
+        proximityManager.setEddystoneListener(createEddystoneListener());
 
         Dexter.withActivity(this)
                 .withPermission(Manifest.permission.ACCESS_FINE_LOCATION)
@@ -73,11 +97,7 @@ public class MainActivity extends AppCompatActivity {
                 Log.i("LOC", location.getLatitude() + "" + location.getLongitude());
 
                 //a0001
-                FirebaseDatabase database = FirebaseDatabase.getInstance();
-                DatabaseReference inputLon = database.getReference("users/a0002/lon");
-                inputLon.setValue(location.getLongitude());
-                DatabaseReference inputLat = database.getReference("users/a0002/lat");
-                inputLat.setValue(location.getLatitude());
+                latestLocation = location;
             }
 
             public void onStatusChanged(String provider, int status, Bundle extras) {
@@ -105,6 +125,7 @@ public class MainActivity extends AppCompatActivity {
 
         Switch enableDetection = findViewById(R.id.button3);
         enableDetection.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            @SuppressLint("MissingPermission")
             @Override
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
                 if (isChecked == true) {
@@ -118,4 +139,65 @@ public class MainActivity extends AppCompatActivity {
         });
 
     }
+    @Override
+    protected void onStart() {
+        super.onStart();
+        startScanning();
+    }
+
+    @Override
+    protected void onStop() {
+        proximityManager.stopScanning();
+        super.onStop();
+    }
+
+    @Override
+    protected void onDestroy() {
+        proximityManager.disconnect();
+        proximityManager = null;
+        super.onDestroy();
+    }
+
+    private void startScanning() {
+        proximityManager.connect(new OnServiceReadyListener() {
+            @Override
+            public void onServiceReady() {
+                proximityManager.startScanning();
+            }
+        });
+    }
+
+    private IBeaconListener createIBeaconListener() {
+        return new SimpleIBeaconListener() {
+            @Override
+            public void onIBeaconDiscovered(IBeaconDevice ibeacon, IBeaconRegion region) {
+                Log.i("Sample", "IBeacon discovered: " + ibeacon.toString());
+            }
+
+            @Override
+            public void onIBeaconsUpdated(List<IBeaconDevice> ibeacons, IBeaconRegion region) {
+                super.onIBeaconsUpdated(ibeacons, region);
+                for(IBeaconDevice ibeacon : ibeacons) {
+                    if (latestLocation != null) {
+                        Log.i("Sample", "IBeacon discovered: " + ibeacon.toString());
+                        FirebaseDatabase database = FirebaseDatabase.getInstance();
+                        DatabaseReference inputLon = database.getReference("users/" + ibeacon.getUniqueId() + "/lon");
+                        inputLon.setValue(latestLocation.getLongitude());
+                        DatabaseReference inputLat = database.getReference("users/" + ibeacon.getUniqueId() + "/lat");
+                        inputLat.setValue(latestLocation.getLatitude());
+                    }
+                }
+            }
+        };
+    }
+
+    private EddystoneListener createEddystoneListener() {
+        return new SimpleEddystoneListener() {
+            @Override
+            public void onEddystoneDiscovered(IEddystoneDevice eddystone, IEddystoneNamespace namespace) {
+                Log.i("Sample", "Eddystone discovered: " + eddystone.toString());
+            }
+        };
+    }
 }
+
